@@ -1,25 +1,23 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
+import { supabase } from "@/lib/supabase";
 
 const links = [
-  {
-    name: "Overview",
-    href: "/dashboard",
-  },
-  {
-    name: "Calendar View",
-    href: "/calendar",
-  },
-  {
-    name: "Monthly Analysis",
-    href: "/analysis",
-  },
+  { href: "/dashboard", label: "Dashboard" },
+  { href: "/calendar", label: "Calendar" },
+  { href: "/analysis", label: "Monthly Analysis" },
 ];
 
 export default function Sidebar() {
   const pathname = usePathname();
+  const router = useRouter();
+
+  async function handleLogout() {
+    await supabase.auth.signOut();
+    router.push("/auth");
+  }
 
   return (
     <aside className="flex h-screen w-64 flex-col border-r border-zinc-800 bg-black px-5 py-6">
@@ -47,23 +45,18 @@ export default function Sidebar() {
                   : "text-zinc-400 hover:bg-zinc-900 hover:text-white"
               }`}
             >
-              {link.name}
+              {link.label}
             </Link>
           );
         })}
       </nav>
 
-      <div className="mt-auto rounded-2xl border border-zinc-800 bg-zinc-950 p-4">
-        <p className="text-xs uppercase tracking-[0.2em] text-zinc-500">
-          Futures Performance
-        </p>
-
-        <p className="mt-2 text-sm text-zinc-300">
-          Track the plan.
-          <br />
-          Control the emotion.
-        </p>
-      </div>
+      <button
+        onClick={handleLogout}
+        className="mt-auto rounded-xl border border-red-900/60 px-4 py-3 text-sm font-bold text-red-400 transition hover:bg-red-950/40"
+      >
+        Logout
+      </button>
     </aside>
   );
 }
