@@ -518,7 +518,7 @@ function buildCalendarDays(currentDate: Date, trades: CloudTrade[]) {
     date.setDate(startDate.getDate() + i);
 
     const dayTrades = trades.filter((trade) => {
-      return isSameDay(new Date(trade.date), date);
+      return isSameDay(parseTradeDate(trade.date), date);
     });
 
     const pnl = dayTrades.reduce(
@@ -581,7 +581,20 @@ function getDayWinRate(day: CalendarDay) {
   return Math.round((wins.length / day.trades.length) * 100);
 }
 
-function isSameDay(dateA: Date, dateB: Date) {
+function parseTradeDate(value?: string) {
+  if (!value) return null;
+
+  const cleanValue = value.slice(0, 10);
+  const [year, month, day] = cleanValue.split("-").map(Number);
+
+  if (!year || !month || !day) return null;
+
+  return new Date(year, month - 1, day);
+}
+
+function isSameDay(dateA: Date | null, dateB: Date) {
+  if (!dateA) return false;
+
   return (
     dateA.getFullYear() === dateB.getFullYear() &&
     dateA.getMonth() === dateB.getMonth() &&

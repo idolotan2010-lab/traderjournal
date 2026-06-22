@@ -6,7 +6,6 @@ export type Trade = {
   direction: TradeDirection;
   entryPrice: number;
   exitPrice: number;
-  stopLoss: number;
   quantity: number;
   setup: string;
   notes: string;
