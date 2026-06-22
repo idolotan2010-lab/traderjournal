@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
@@ -14,7 +15,19 @@ const links = [
 export default function Sidebar() {
   const pathname = usePathname();
   const router = useRouter();
+  const [user, setUser] = useState<any>(null);
 
+  useEffect(() => {
+    async function loadUser() {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+  
+      setUser(user);
+    }
+  
+    loadUser();
+  }, []);
   async function handleLogout() {
     await supabase.auth.signOut();
     router.push("/auth");
@@ -120,12 +133,30 @@ export default function Sidebar() {
           </div>
         </div>
 
-        <button
-          onClick={handleLogout}
-          className="w-full rounded-2xl border border-rose-500/25 bg-rose-500/10 px-4 py-3 text-sm font-black text-rose-300 transition hover:bg-rose-500/20"
-        >
-          Logout
-        </button>
+        {user ? (
+ {user ? (
+  <button
+    onClick={handleLogout}
+    className="w-full rounded-2xl border border-rose-500/25 bg-rose-500/10 px-4 py-3 text-sm font-black text-rose-300 transition hover:bg-rose-500/20"
+  >
+    Logout
+  </button>
+) : (
+  <button
+    onClick={() => router.push("/auth")}
+    className="w-full rounded-2xl border border-emerald-500/25 bg-emerald-500/10 px-4 py-3 text-sm font-black text-emerald-300 transition hover:bg-emerald-500/20"
+  >
+    Login
+  </button>
+)}
+) : (
+  <button
+    onClick={() => router.push("/login")}
+    className="w-full rounded-2xl border border-emerald-500/25 bg-emerald-500/10 px-4 py-3 text-sm font-black text-emerald-300 transition hover:bg-emerald-500/20"
+  >
+    Login
+  </button>
+)}
       </div>
     </aside>
   );

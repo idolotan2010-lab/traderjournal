@@ -78,6 +78,8 @@ export default function DashboardPage() {
       direction: trade.direction,
       entry: trade.entry,
       exit: trade.exit,
+      stopLoss: trade.stopLoss,
+      takeProfit: trade.takeProfit,
       quantity: trade.quantity,
       pnl: trade.pnl,
       reason: trade.reason,
