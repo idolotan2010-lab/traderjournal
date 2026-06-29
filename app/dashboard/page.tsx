@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import PageShell from "@/components/dashboard/page-shell";
 import NewTradeModal, { Trade } from "@/components/dashboard/new-trade-modal";
 import { supabase } from "@/lib/supabase";
+import { Toaster, toast } from "sonner";
 
 import {
   ResponsiveContainer,
@@ -44,7 +45,7 @@ export default function DashboardPage() {
       .order("date", { ascending: false });
 
     if (error) {
-      alert(error.message);
+      toast.error(error.message);
       return;
     }
 
@@ -69,7 +70,7 @@ export default function DashboardPage() {
     } = await supabase.auth.getUser();
 
     if (!user) {
-      alert("You must be logged in");
+      toast.error("You must be logged in");
       return;
     }
 
@@ -99,9 +100,11 @@ export default function DashboardPage() {
         .eq("id", tradeToUpdate.id);
 
       if (error) {
-        alert(error.message);
+        toast.error(error.message);
         return;
       }
+
+      toast.success("Trade updated successfully");
     } else {
       const { error } = await supabase.from("trades").insert([
         {
@@ -111,9 +114,11 @@ export default function DashboardPage() {
       ]);
 
       if (error) {
-        alert(error.message);
+        toast.error(error.message);
         return;
       }
+
+      toast.success("Trade saved successfully");
     }
 
     setIsOpen(false);
@@ -130,10 +135,11 @@ export default function DashboardPage() {
     const { error } = await supabase.from("trades").delete().eq("id", trade.id);
 
     if (error) {
-      alert(error.message);
+      toast.error(error.message);
       return;
     }
 
+    toast.success("Trade deleted successfully");
     loadTrades();
   }
 
@@ -216,6 +222,19 @@ export default function DashboardPage() {
 
   return (
     <PageShell>
+      <Toaster
+        position="top-right"
+        richColors
+        theme="dark"
+        toastOptions={{
+          style: {
+            background: "#070914",
+            border: "1px solid rgba(139, 92, 246, 0.25)",
+            color: "#fff",
+          },
+        }}
+      />
+
       <div className="space-y-6">
         <div className="flex items-center justify-between">
           <div>
