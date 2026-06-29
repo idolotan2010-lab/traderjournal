@@ -47,7 +47,7 @@ type TradingRule = {
 type Props = {
   isOpen: boolean;
   onClose: () => void;
-  onSave: (trade: Trade) => void;
+  onSave: (trade: Trade) => boolean | Promise<boolean>;
   initialData?: Trade | null;
 };
 
@@ -215,6 +215,7 @@ export default function NewTradeModal({ isOpen, onClose, onSave, initialData }: 
   const [mood, setMood] = useState("");
   const [image, setImage] = useState<string>("");
   const [isMoodOpen, setIsMoodOpen] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const [rules, setRules] = useState<TradingRule[]>([]);
   const [ruleChecks, setRuleChecks] = useState<Record<number, RuleStatus>>({});
   const dateInputRef = useRef<HTMLInputElement | null>(null);
@@ -260,6 +261,8 @@ export default function NewTradeModal({ isOpen, onClose, onSave, initialData }: 
       setMood("");
       setImage("");
     }
+
+    setIsSaving(false);
   }, [initialData, isOpen]);
 
   const contractMultiplier = useMemo(() => getContractMultiplier(symbol), [symbol]);
@@ -306,10 +309,12 @@ export default function NewTradeModal({ isOpen, onClose, onSave, initialData }: 
     localStorage.setItem("tradingRules", JSON.stringify(updatedRules));
   }
 
-  function saveTrade() {
-    updateRulesStats();
+  async function saveTrade() {
+    if (isSaving) return;
 
-    onSave({
+    setIsSaving(true);
+
+    const savedSuccessfully = await onSave({
       symbol,
       direction,
       entry,
@@ -330,6 +335,14 @@ export default function NewTradeModal({ isOpen, onClose, onSave, initialData }: 
       })),
     });
 
+    if (!savedSuccessfully) {
+      setIsSaving(false);
+      return;
+    }
+
+    updateRulesStats();
+
+    setIsSaving(false);
     onClose();
   }
 
@@ -360,8 +373,10 @@ export default function NewTradeModal({ isOpen, onClose, onSave, initialData }: 
           </div>
 
           <button
+            type="button"
+            disabled={isSaving}
             onClick={onClose}
-            className="rounded-2xl border border-zinc-700 px-4 py-2 text-zinc-300 hover:bg-zinc-800 hover:text-white"
+            className="rounded-2xl border border-zinc-700 px-4 py-2 text-zinc-300 hover:bg-zinc-800 hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
           >
             Close
           </button>
@@ -751,17 +766,21 @@ export default function NewTradeModal({ isOpen, onClose, onSave, initialData }: 
 
         <div className="mt-8 flex justify-end gap-3">
           <button
+            type="button"
+            disabled={isSaving}
             onClick={onClose}
-            className="rounded-2xl border border-zinc-700 px-6 py-3 text-zinc-300 hover:bg-zinc-800"
+            className="rounded-2xl border border-zinc-700 px-6 py-3 text-zinc-300 hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-50"
           >
             Cancel
           </button>
 
           <button
+            type="button"
+            disabled={isSaving}
             onClick={saveTrade}
-            className="rounded-2xl bg-gradient-to-r from-emerald-400 via-cyan-400 to-violet-500 px-7 py-3 font-black text-black shadow-[0_0_35px_rgba(16,185,129,0.25)]"
+            className="rounded-2xl bg-gradient-to-r from-emerald-400 via-cyan-400 to-violet-500 px-7 py-3 font-black text-black shadow-[0_0_35px_rgba(16,185,129,0.25)] transition disabled:cursor-not-allowed disabled:opacity-60"
           >
-            {initialData ? "Save Changes" : "Save Trade"}
+            {isSaving ? "Saving..." : initialData ? "Save Changes" : "Save Trade"}
           </button>
         </div>
       </div>

@@ -71,7 +71,7 @@ export default function DashboardPage() {
 
     if (!user) {
       toast.error("You must be logged in");
-      return;
+      return false;
     }
 
     const tradePayload = {
@@ -92,7 +92,7 @@ export default function DashboardPage() {
     if (editingIndex !== null) {
       const tradeToUpdate = trades[editingIndex];
 
-      if (!tradeToUpdate?.id) return;
+      if (!tradeToUpdate?.id) return false;
 
       const { error } = await supabase
         .from("trades")
@@ -101,7 +101,7 @@ export default function DashboardPage() {
 
       if (error) {
         toast.error(error.message);
-        return;
+        return false;
       }
 
       toast.success("Trade updated successfully");
@@ -115,16 +115,17 @@ export default function DashboardPage() {
 
       if (error) {
         toast.error(error.message);
-        return;
+        return false;
       }
 
       toast.success("Trade saved successfully");
     }
 
-    setIsOpen(false);
     setEditingTrade(null);
     setEditingIndex(null);
     loadTrades();
+
+    return true;
   }
 
   async function deleteTrade(index: number) {
