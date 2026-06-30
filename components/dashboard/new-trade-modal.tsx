@@ -44,6 +44,14 @@ type TradingRule = {
   status: RuleStatus;
 };
 
+type ValidationErrors = {
+  symbol?: string;
+  date?: string;
+  entry?: string;
+  exit?: string;
+  quantity?: string;
+};
+
 type Props = {
   isOpen: boolean;
   onClose: () => void;
@@ -216,9 +224,14 @@ export default function NewTradeModal({ isOpen, onClose, onSave, initialData }: 
   const [image, setImage] = useState<string>("");
   const [isMoodOpen, setIsMoodOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [errors, setErrors] = useState<ValidationErrors>({});
   const [rules, setRules] = useState<TradingRule[]>([]);
   const [ruleChecks, setRuleChecks] = useState<Record<number, RuleStatus>>({});
   const dateInputRef = useRef<HTMLInputElement | null>(null);
+  const symbolInputRef = useRef<HTMLInputElement | null>(null);
+  const entryInputRef = useRef<HTMLInputElement | null>(null);
+  const exitInputRef = useRef<HTMLInputElement | null>(null);
+  const quantityInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
     const savedRules = localStorage.getItem("tradingRules");
@@ -263,7 +276,46 @@ export default function NewTradeModal({ isOpen, onClose, onSave, initialData }: 
     }
 
     setIsSaving(false);
+    setErrors({});
   }, [initialData, isOpen]);
+
+  useEffect(() => {
+    function handleKeyboardShortcuts(event: KeyboardEvent) {
+      if (!isOpen) return;
+
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "s") {
+        event.preventDefault();
+        saveTrade();
+      }
+
+      if (event.key === "Escape" && !isSaving) {
+        event.preventDefault();
+        onClose();
+      }
+    }
+
+    window.addEventListener("keydown", handleKeyboardShortcuts);
+
+    return () => {
+      window.removeEventListener("keydown", handleKeyboardShortcuts);
+    };
+  }, [
+    isOpen,
+    isSaving,
+    symbol,
+    direction,
+    entry,
+    exit,
+    quantity,
+    date,
+    notes,
+    wentWell,
+    improvement,
+    mood,
+    image,
+    ruleChecks,
+    rules,
+  ]);
 
   const contractMultiplier = useMemo(() => getContractMultiplier(symbol), [symbol]);
 
@@ -291,6 +343,54 @@ export default function NewTradeModal({ isOpen, onClose, onSave, initialData }: 
 
   if (!isOpen) return null;
 
+  function clearError(field: keyof ValidationErrors) {
+    if (!errors[field]) return;
+
+    setErrors((currentErrors) => {
+      const updatedErrors = { ...currentErrors };
+      delete updatedErrors[field];
+      return updatedErrors;
+    });
+  }
+
+  function validateTrade() {
+    const nextErrors: ValidationErrors = {};
+
+    if (!symbol.trim()) {
+      nextErrors.symbol = "Symbol is required";
+    }
+
+    if (!date) {
+      nextErrors.date = "Date is required";
+    }
+
+    if (!entry) {
+      nextErrors.entry = "Entry price is required";
+    }
+
+    if (!exit) {
+      nextErrors.exit = "Exit price is required";
+    }
+
+    if (!quantity) {
+      nextErrors.quantity = "Contracts are required";
+    }
+
+    setErrors(nextErrors);
+
+    const firstError = Object.keys(nextErrors)[0] as keyof ValidationErrors | undefined;
+
+    setTimeout(() => {
+      if (firstError === "symbol") symbolInputRef.current?.focus();
+      if (firstError === "date") dateInputRef.current?.showPicker();
+      if (firstError === "entry") entryInputRef.current?.focus();
+      if (firstError === "exit") exitInputRef.current?.focus();
+      if (firstError === "quantity") quantityInputRef.current?.focus();
+    }, 0);
+
+    return Object.keys(nextErrors).length === 0;
+  }
+
   function setRuleStatus(ruleId: number, status: RuleStatus) {
     setRuleChecks({ ...ruleChecks, [ruleId]: status });
   }
@@ -311,6 +411,8 @@ export default function NewTradeModal({ isOpen, onClose, onSave, initialData }: 
 
   async function saveTrade() {
     if (isSaving) return;
+
+    if (!validateTrade()) return;
 
     setIsSaving(true);
 
@@ -385,18 +487,36 @@ export default function NewTradeModal({ isOpen, onClose, onSave, initialData }: 
         {/* BASIC TRADE INFO */}
 
         <div className="grid gap-4 md:grid-cols-3">
-          <input
-            value={symbol}
-            onChange={(e) => setSymbol(e.target.value)}
-            placeholder="Symbol"
-            className="rounded-2xl border border-zinc-800 bg-black/40 p-4 text-white outline-none focus:border-violet-400"
-          />
+          <div>
+            <input
+              ref={symbolInputRef}
+              disabled={isSaving}
+              value={symbol}
+              onChange={(e) => {
+                setSymbol(e.target.value);
+                clearError("symbol");
+              }}
+              placeholder="Symbol"
+              className={`w-full rounded-2xl border bg-black/40 p-4 text-white outline-none disabled:cursor-not-allowed disabled:opacity-60 ${
+                errors.symbol
+                  ? "border-rose-500 focus:border-rose-400"
+                  : "border-zinc-800 focus:border-violet-400 disabled:cursor-not-allowed disabled:opacity-60"
+              }`}
+            />
+
+            {errors.symbol && (
+              <p className="mt-2 text-xs font-bold text-rose-400">
+                {errors.symbol}
+              </p>
+            )}
+          </div>
 
           <div className="grid grid-cols-2 gap-2 rounded-2xl border border-zinc-800 bg-black/20 p-1">
             <button
               type="button"
+              disabled={isSaving}
               onClick={() => setDirection("Long")}
-              className={`rounded-xl border px-4 py-3 font-black tracking-wide transition-all ${
+              className={`rounded-xl border px-4 py-3 font-black tracking-wide transition-all disabled:cursor-not-allowed disabled:opacity-60 ${
                 direction === "Long"
                   ? "border-emerald-400/40 bg-gradient-to-r from-emerald-500/20 to-cyan-500/20 text-emerald-300 shadow-[0_0_25px_rgba(16,185,129,0.15)]"
                   : "border-zinc-800 bg-black/30 text-zinc-500 hover:border-emerald-500/25 hover:text-emerald-300"
@@ -407,8 +527,9 @@ export default function NewTradeModal({ isOpen, onClose, onSave, initialData }: 
 
             <button
               type="button"
+              disabled={isSaving}
               onClick={() => setDirection("Short")}
-              className={`rounded-xl border px-4 py-3 font-black tracking-wide transition-all ${
+              className={`rounded-xl border px-4 py-3 font-black tracking-wide transition-all disabled:cursor-not-allowed disabled:opacity-60 ${
                 direction === "Short"
                   ? "border-rose-400/40 bg-gradient-to-r from-rose-500/20 to-orange-500/20 text-rose-300 shadow-[0_0_25px_rgba(244,63,94,0.15)]"
                   : "border-zinc-800 bg-black/30 text-zinc-500 hover:border-rose-500/25 hover:text-rose-300"
@@ -418,62 +539,128 @@ export default function NewTradeModal({ isOpen, onClose, onSave, initialData }: 
             </button>
           </div>
 
-          <button
-            type="button"
-            onClick={() => dateInputRef.current?.showPicker()}
-            className="relative rounded-2xl border border-zinc-800 bg-black/40 p-4 text-left text-white outline-none transition hover:border-violet-500/40 focus:border-violet-400"
-          >
-            <input
-              ref={dateInputRef}
-              value={date}
-              onChange={(e) => setDate(e.target.value)}
-              type="date"
-              className="pointer-events-none absolute h-0 w-0 opacity-0"
-              tabIndex={-1}
-            />
+          <div>
+            <button
+              type="button"
+              disabled={isSaving}
+              onClick={() => dateInputRef.current?.showPicker()}
+              className={`relative w-full rounded-2xl border bg-black/40 p-4 text-left text-white outline-none transition hover:border-violet-500/40 focus:border-violet-400 disabled:cursor-not-allowed disabled:opacity-60 ${
+                errors.date ? "border-rose-500" : "border-zinc-800"
+              }`}
+            >
+              <input
+                ref={dateInputRef}
+                disabled={isSaving}
+                value={date}
+                onChange={(e) => {
+                  setDate(e.target.value);
+                  clearError("date");
+                }}
+                type="date"
+                className="pointer-events-none absolute h-0 w-0 opacity-0"
+                tabIndex={-1}
+              />
 
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <p className="text-xs font-bold uppercase tracking-[0.2em] text-violet-300">
-                  Date
-                </p>
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-xs font-bold uppercase tracking-[0.2em] text-violet-300">
+                    Date
+                  </p>
 
-                <p className="mt-1 text-lg font-black text-white">
-                  {formatTradeDate(date)}
-                </p>
+                  <p className="mt-1 text-lg font-black text-white">
+                    {formatTradeDate(date)}
+                  </p>
+                </div>
+
+                <span className="rounded-xl border border-violet-500/30 bg-violet-500/10 px-3 py-2 text-lg text-violet-300">
+                  📅
+                </span>
               </div>
+            </button>
 
-              <span className="rounded-xl border border-violet-500/30 bg-violet-500/10 px-3 py-2 text-lg text-violet-300">
-                📅
-              </span>
-            </div>
-          </button>
+            {errors.date && (
+              <p className="mt-2 text-xs font-bold text-rose-400">
+                {errors.date}
+              </p>
+            )}
+          </div>
         </div>
 
         <div className="mt-4 grid gap-4 md:grid-cols-3">
-          <input
-            value={entry}
-            onChange={(e) => setEntry(e.target.value)}
-            placeholder="Entry"
-            type="number"
-            className="rounded-2xl border border-zinc-800 bg-black/40 p-4 text-white outline-none focus:border-violet-400"
-          />
+          <div>
+            <input
+              ref={entryInputRef}
+              disabled={isSaving}
+              value={entry}
+              onChange={(e) => {
+                setEntry(e.target.value);
+                clearError("entry");
+              }}
+              placeholder="Entry"
+              type="number"
+              className={`w-full rounded-2xl border bg-black/40 p-4 text-white outline-none disabled:cursor-not-allowed disabled:opacity-60 ${
+                errors.entry
+                  ? "border-rose-500 focus:border-rose-400"
+                  : "border-zinc-800 focus:border-violet-400 disabled:cursor-not-allowed disabled:opacity-60"
+              }`}
+            />
 
-          <input
-            value={exit}
-            onChange={(e) => setExit(e.target.value)}
-            placeholder="Exit"
-            type="number"
-            className="rounded-2xl border border-zinc-800 bg-black/40 p-4 text-white outline-none focus:border-violet-400"
-          />
+            {errors.entry && (
+              <p className="mt-2 text-xs font-bold text-rose-400">
+                {errors.entry}
+              </p>
+            )}
+          </div>
 
-          <input
-            value={quantity}
-            onChange={(e) => setQuantity(e.target.value)}
-            placeholder="Contracts"
-            type="number"
-            className="rounded-2xl border border-zinc-800 bg-black/40 p-4 text-white outline-none focus:border-violet-400"
-          />
+          <div>
+            <input
+              ref={exitInputRef}
+              disabled={isSaving}
+              value={exit}
+              onChange={(e) => {
+                setExit(e.target.value);
+                clearError("exit");
+              }}
+              placeholder="Exit"
+              type="number"
+              className={`w-full rounded-2xl border bg-black/40 p-4 text-white outline-none disabled:cursor-not-allowed disabled:opacity-60 ${
+                errors.exit
+                  ? "border-rose-500 focus:border-rose-400"
+                  : "border-zinc-800 focus:border-violet-400 disabled:cursor-not-allowed disabled:opacity-60"
+              }`}
+            />
+
+            {errors.exit && (
+              <p className="mt-2 text-xs font-bold text-rose-400">
+                {errors.exit}
+              </p>
+            )}
+          </div>
+
+          <div>
+            <input
+              ref={quantityInputRef}
+              disabled={isSaving}
+              value={quantity}
+              onChange={(e) => {
+                setQuantity(e.target.value);
+                clearError("quantity");
+              }}
+              placeholder="Contracts"
+              type="number"
+              className={`w-full rounded-2xl border bg-black/40 p-4 text-white outline-none disabled:cursor-not-allowed disabled:opacity-60 ${
+                errors.quantity
+                  ? "border-rose-500 focus:border-rose-400"
+                  : "border-zinc-800 focus:border-violet-400 disabled:cursor-not-allowed disabled:opacity-60"
+              }`}
+            />
+
+            {errors.quantity && (
+              <p className="mt-2 text-xs font-bold text-rose-400">
+                {errors.quantity}
+              </p>
+            )}
+          </div>
         </div>
 
         {/* KPI CARDS */}
@@ -505,8 +692,9 @@ export default function NewTradeModal({ isOpen, onClose, onSave, initialData }: 
 
             <button
               type="button"
+              disabled={isSaving}
               onClick={() => setIsMoodOpen(!isMoodOpen)}
-              className={`mt-3 w-full text-center text-3xl font-black ${moodTheme.text}`}
+              className={`mt-3 w-full text-center text-3xl font-black ${moodTheme.text} disabled:cursor-not-allowed disabled:opacity-60`}
             >
               {mood || "Select Mood"}
             </button>
@@ -558,6 +746,7 @@ export default function NewTradeModal({ isOpen, onClose, onSave, initialData }: 
 
             <input
               type="file"
+              disabled={isSaving}
               accept="image/*"
               onChange={(e) => handleImageUpload(e.target.files?.[0])}
               className="hidden"
@@ -603,10 +792,11 @@ export default function NewTradeModal({ isOpen, onClose, onSave, initialData }: 
               </div>
 
               <textarea
+                disabled={isSaving}
                 value={wentWell}
                 onChange={(e) => setWentWell(e.target.value)}
                 placeholder="What did you execute well in this trade?"
-                className="min-h-[96px] w-full rounded-2xl border border-emerald-500/20 bg-black/40 p-4 text-white outline-none placeholder:text-zinc-600 focus:border-emerald-400"
+                className="min-h-[96px] w-full rounded-2xl border border-emerald-500/20 bg-black/40 p-4 text-white outline-none placeholder:text-zinc-600 focus:border-emerald-400 disabled:cursor-not-allowed disabled:opacity-60"
               />
             </div>
 
@@ -631,6 +821,7 @@ export default function NewTradeModal({ isOpen, onClose, onSave, initialData }: 
                   <button
                     key={item}
                     type="button"
+                    disabled={isSaving}
                     onClick={() =>
                       setImprovement((current) =>
                         current
@@ -638,7 +829,7 @@ export default function NewTradeModal({ isOpen, onClose, onSave, initialData }: 
                           : item
                       )
                     }
-                    className="rounded-xl border border-orange-500/20 bg-black/30 px-3 py-2 text-left text-xs font-bold text-orange-200 hover:border-orange-400/50 hover:bg-orange-500/10"
+                    className="rounded-xl border border-orange-500/20 bg-black/30 px-3 py-2 text-left text-xs font-bold text-orange-200 hover:border-orange-400/50 hover:bg-orange-500/10 disabled:cursor-not-allowed disabled:opacity-60"
                   >
                     + {item}
                   </button>
@@ -646,20 +837,22 @@ export default function NewTradeModal({ isOpen, onClose, onSave, initialData }: 
               </div>
 
               <textarea
+                disabled={isSaving}
                 value={improvement}
                 onChange={(e) => setImprovement(e.target.value)}
                 placeholder="What would you do better next time?"
-                className="min-h-[80px] w-full rounded-2xl border border-orange-500/20 bg-black/40 p-4 text-white outline-none placeholder:text-zinc-600 focus:border-orange-400"
+                className="min-h-[80px] w-full rounded-2xl border border-orange-500/20 bg-black/40 p-4 text-white outline-none placeholder:text-zinc-600 focus:border-orange-400 disabled:cursor-not-allowed disabled:opacity-60"
               />
             </div>
           </div>
 
           <div className="mt-4">
             <textarea
+              disabled={isSaving}
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               placeholder="General notes..."
-              className="min-h-[110px] w-full rounded-3xl border border-zinc-800 bg-black/40 p-5 text-white outline-none placeholder:text-zinc-600 focus:border-violet-400"
+              className="min-h-[110px] w-full rounded-3xl border border-zinc-800 bg-black/40 p-5 text-white outline-none placeholder:text-zinc-600 focus:border-violet-400 disabled:cursor-not-allowed disabled:opacity-60"
             />
           </div>
         </div>
@@ -726,8 +919,9 @@ export default function NewTradeModal({ isOpen, onClose, onSave, initialData }: 
                     <div className="mt-4 grid grid-cols-2 gap-2">
                       <button
                         type="button"
+                        disabled={isSaving}
                         onClick={() => setRuleStatus(rule.id, "Followed")}
-                        className={`rounded-xl border px-3 py-2 text-xs font-black ${
+                        className={`rounded-xl border px-3 py-2 text-xs font-black disabled:cursor-not-allowed disabled:opacity-60 ${
                           selectedStatus === "Followed"
                             ? "border-emerald-500/40 bg-emerald-500/20 text-emerald-300"
                             : "border-zinc-800 text-zinc-500"
@@ -738,8 +932,9 @@ export default function NewTradeModal({ isOpen, onClose, onSave, initialData }: 
 
                       <button
                         type="button"
+                        disabled={isSaving}
                         onClick={() => setRuleStatus(rule.id, "Broken")}
-                        className={`rounded-xl border px-3 py-2 text-xs font-black ${
+                        className={`rounded-xl border px-3 py-2 text-xs font-black disabled:cursor-not-allowed disabled:opacity-60 ${
                           selectedStatus === "Broken"
                             ? "border-rose-500/40 bg-rose-500/20 text-rose-300"
                             : "border-zinc-800 text-zinc-500"
@@ -780,7 +975,16 @@ export default function NewTradeModal({ isOpen, onClose, onSave, initialData }: 
             onClick={saveTrade}
             className="rounded-2xl bg-gradient-to-r from-emerald-400 via-cyan-400 to-violet-500 px-7 py-3 font-black text-black shadow-[0_0_35px_rgba(16,185,129,0.25)] transition disabled:cursor-not-allowed disabled:opacity-60"
           >
-            {isSaving ? "Saving..." : initialData ? "Save Changes" : "Save Trade"}
+            {isSaving ? (
+              <span className="flex items-center gap-2">
+                <span className="h-4 w-4 animate-spin rounded-full border-2 border-black/30 border-t-black" />
+                Saving trade...
+              </span>
+            ) : initialData ? (
+              "Save Changes"
+            ) : (
+              "Save Trade"
+            )}
           </button>
         </div>
       </div>
